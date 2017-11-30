@@ -11,6 +11,7 @@ import (
     "time"
     "strconv"
     "bufio"
+    "runtime"
 )
 
 const DEFAULT_LEVEL = 1
@@ -43,14 +44,27 @@ func random_result(expected int) (int) {
     return choices[i]
 }
 
-func create_result() (int) {
-    return 0
+func disable_display_character() {
+    if runtime.GOOS == "darwin" {
+        exec.Command("stty", "-f", "/dev/tty", "cbreak", "min", "1").Run()
+        exec.Command("stty", "-f", "/dev/tty", "-echo").Run()
+    } else {
+        exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+        exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
+    }
+}
+
+func enable_display_character() {
+    if runtime.GOOS == "darwin" {
+        exec.Command("stty", "-f", "/dev/tty", "echo").Run()
+    } else {
+        exec.Command("stty", "-F", "/dev/tty", "echo").Run()
+    }
 }
 
 func main() {
     defer func() {
-        // Display entered characters on the screen
-        exec.Command("stty", "-F", "/dev/tty", "echo").Run()
+        enable_display_character()
     }()
 
     sigs := make(chan os.Signal, 1)
@@ -59,8 +73,7 @@ func main() {
     go func() {
         sig := <-sigs
         if sig == syscall.SIGINT || sig == syscall.SIGTERM {
-            // Display entered characters on the screen
-            exec.Command("stty", "-F", "/dev/tty", "echo").Run()
+            enable_display_character()
             os.Exit(0)
         }
     }()
@@ -82,10 +95,7 @@ func main() {
     n := number.New()
     n.Set_level(level)
 
-    // Disable input buffering
-    exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-    // Do not display entered characters on the screen
-    exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
+    disable_display_character()
 
     fmt.Println("-------------------------")
     fmt.Println("Enter t/T (true) or f/F (false) to answer")

@@ -35,6 +35,10 @@ func random_result(expected int) (int) {
     n := number.New()
     choices := make([]int, 0)
 
+    // We create a list of choices
+    // 1. Correct choice
+    // 2. Wrong choice but somewhere near the answer
+    // 3. Random between 0 and the anser
     choices = append(choices, expected)
     choices = append(choices, n.Random_around(expected, DEFAULT_AROUND))
     choices = append(choices, n.Random(expected, 0))
@@ -45,6 +49,7 @@ func random_result(expected int) (int) {
 }
 
 func disable_display_character() {
+    // stty commands on Mac OS and Linux a different
     if runtime.GOOS == "darwin" {
         exec.Command("stty", "-f", "/dev/tty", "cbreak", "min", "1").Run()
         exec.Command("stty", "-f", "/dev/tty", "-echo").Run()
@@ -63,10 +68,12 @@ func enable_display_character() {
 }
 
 func main() {
+    // Restore setting of terminal finally
     defer func() {
         enable_display_character()
     }()
 
+    // Handle SIGINT and SIGTERM signals to restore setting of terminal
     sigs := make(chan os.Signal, 1)
     signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
@@ -85,6 +92,7 @@ func main() {
     text, _ := reader.ReadString('\n')
     level, err := strconv.Atoi(text[:len(text) - 1])
 
+    // We only accept an integer number which is greater than 0
     for err != nil || level <= 0 {
         fmt.Printf("Enter level (1, 2... etc): ")
         text, _ = reader.ReadString('\n')
@@ -105,6 +113,7 @@ func main() {
     for {
         op := o.Random()
         left := n.Random_default()
+        // If one number is greater than 10 and arithmetic is TIMES, the other must be less than 10
         var right int
         if level > 1 && op == operator.TIMES && left > 10 {
             n.Set_level(1)
@@ -126,11 +135,13 @@ func main() {
         input := make(chan bool, 1)
         expired := make(chan bool, 1)
 
+        // We must answer before timeout
         go func(flag chan bool) {
             time.Sleep(time.Second * DEFAULT_TIMEOUT)
             flag <- true
         }(expired)
 
+        // We only accept answer as a single character
         go func() {
             var b []byte = make([]byte, 1)
             for {
@@ -150,6 +161,7 @@ func main() {
                     expired <- false
                     return
                 default:
+                    // Quit if input character is not t/T or f/F
                     fmt.Println("Your score:", score)
                     sigs <- syscall.SIGTERM
                     return

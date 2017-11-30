@@ -9,9 +9,12 @@ import (
     "syscall"
     "os/signal"
     "time"
+    "strconv"
+    "bufio"
 )
 
 const DEFAULT_LEVEL = 1
+const DEFAULT_AROUND = 3
 const DEFAULT_TIMEOUT = 5
 
 func calculate_result(left int, right int, op operator.Arithmetic) (int) {
@@ -25,6 +28,19 @@ func calculate_result(left int, right int, op operator.Arithmetic) (int) {
     default:
         return 0
     }
+}
+
+func random_result(expected int) (int) {
+    n := number.New()
+    choices := make([]int, 0)
+
+    choices = append(choices, expected)
+    choices = append(choices, n.Random_around(expected, DEFAULT_AROUND))
+    choices = append(choices, n.Random(expected, 0))
+
+    i := n.Random(2, 0)
+
+    return choices[i]
 }
 
 func create_result() (int) {
@@ -49,26 +65,46 @@ func main() {
         }
     }()
 
+    fmt.Println("FREAKING MATH")
+    fmt.Println("-------------------------")
+    fmt.Printf("Enter level (1, 2... etc): ")
+    reader := bufio.NewReader(os.Stdin)
+    text, _ := reader.ReadString('\n')
+    level, err := strconv.Atoi(text[:len(text) - 1])
+
+    for err != nil || level <= 0 {
+        fmt.Printf("Enter level (1, 2... etc): ")
+        text, _ = reader.ReadString('\n')
+        level, err = strconv.Atoi(text[:len(text) - 1])
+    }
+
+    o := operator.New()
+    n := number.New()
+    n.Set_level(level)
+
     // Disable input buffering
     exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
     // Do not display entered characters on the screen
     exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
 
-    fmt.Println("FREAKING MATH")
+    fmt.Println("-------------------------")
     fmt.Println("Enter t/T (true) or f/F (false) to answer")
-
-    o := operator.New()
-    n := number.New()
-    n.Set_level(2)
-
+    fmt.Println("-------------------------")
     score := 0
 
     for {
-        left := n.Random()
-        right := n.Random()
         op := o.Random()
+        left := n.Random_default()
+        var right int
+        if level > 1 && op == operator.TIMES && left > 10 {
+            n.Set_level(1)
+            right = n.Random_default()
+            n.Set_level(level)
+        } else {
+            right = n.Random_default()
+        }
         result := calculate_result(left, right, op)
-        actual := n.Random_around(result)
+        actual := random_result(result)
 
         fmt.Printf("%d %s %d = %d? ",
             left,
@@ -83,7 +119,7 @@ func main() {
         go func(flag chan bool) {
             time.Sleep(time.Second * DEFAULT_TIMEOUT)
             flag <- true
-        } (expired)
+        }(expired)
 
         go func() {
             var b []byte = make([]byte, 1)

@@ -110,7 +110,10 @@ func main() {
     fmt.Println("-------------------------")
     score := 0
 
-    for {
+    timer := time.NewTimer(time.Duration(DEFAULT_TIMEOUT) * time.Second)
+    continue_looping := true
+
+    for continue_looping == true {
         op := o.Random()
         left := n.Random_default()
         // If one number is greater than 10 and arithmetic is TIMES, the other must be less than 10
@@ -131,15 +134,9 @@ func main() {
             right,
             actual)
 
+        timer.Reset(time.Duration(DEFAULT_TIMEOUT) * time.Second)
         expected := (result == actual)
         input := make(chan bool, 1)
-        expired := make(chan bool, 1)
-
-        // We must answer before timeout
-        go func(flag chan bool) {
-            time.Sleep(time.Second * DEFAULT_TIMEOUT)
-            flag <- true
-        }(expired)
 
         // We only accept answer as a single character
         go func() {
@@ -152,37 +149,38 @@ func main() {
                     fallthrough
                 case "T":
                     input <- true
-                    expired <- false
                     return
                 case "f":
                     fallthrough
                 case "F":
                     input <- false
-                    expired <- false
                     return
                 default:
                     // Quit if input character is not t/T or f/F
                     fmt.Println("Your score:", score)
                     sigs <- syscall.SIGTERM
+                    continue_looping = false
                     return
                 }
             }
         }()
 
-        is_expired := <-expired
-        if is_expired == true {
+        select {
+        case <-timer.C:
             fmt.Println("\nTIMEOUT!")
             fmt.Println("Your score:", score)
-            break
-        }
+            sigs <- syscall.SIGTERM
+            continue_looping = false
 
-        answer := <-input
-        if answer != expected {
-            fmt.Println("\nWRONG!")
-            fmt.Println("Your score:", score)
-            break
-        } else {
-            score = score + 1
+        case answer := <-input:
+            if answer != expected {
+                fmt.Println("\nWRONG!")
+                fmt.Println("Your score:", score)
+                sigs <- syscall.SIGTERM
+                continue_looping = false
+            } else {
+                score = score + 1
+            }
         }
     }
 }
